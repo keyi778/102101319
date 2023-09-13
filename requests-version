@@ -1,0 +1,107 @@
+import re
+import requests  # 发送请求
+
+
+# 由于b站的反爬比较严格，请求头需要以下信息
+headers = {
+    'authority': 'api.bilibili.com',
+    'accept': 'application/json, text/plain, */*',
+    'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
+    # 需定期更换cookie，否则location爬不到
+    'cookie': 'buvid3=80F9E300-720E-9C19-0D28-A5D4230D2DFC87536infoc; b_nut=1676210987; i-wanna-go-back=-1; _uuid=4DD3B7E9-1A29-13AD-47E2-48386A76A8BE90520infoc; nostalgia_conf=-1; CURRENT_FNVAL=4048; rpdid=0zbfVG8QHp|120iIWSrZ|2N|3w1Prd3g; buvid4=FAD8EDA3-9709-41EE-568C-0C9D6FB1DB4D88711-023021222-JYdfLR1UNDTBrQyLrGTyBOYHeVOL1%2BB1AxvBTNw%2BVHPtH9eX3Q%2BZnA%3D%3D; buvid_fp_plain=undefined; DedeUserID=34569657; DedeUserID__ckMd5=f1d0b62514d37ecd; b_ut=5; header_theme_version=CLOSE; CURRENT_PID=de39fa50-cd76-11ed-842d-810a17e96eab; FEED_LIVE_VERSION=V8; hit-new-style-dyn=1; hit-dyn-v2=1; fingerprint=5bf0be3b1bb6fb8d75ba1671a4d654df; buvid_fp=5bf0be3b1bb6fb8d75ba1671a4d654df; LIVE_BUVID=AUTO7816910652238640; SESSDATA=fe04243d%2C1709369802%2C10cb6%2A92AaAMqI1zfwMCavcaBW1sM9l41EVKbV-grlEdaCqYK8nH0TFXqjTjnefAFBFA-eiFRW7MjQAAOQA; bili_jct=a65e3acc9cab9cf24166cf8635ce800f; sid=6vvs0n40; bili_ticket=eyJhbGciOiJIUzI1NiIsImtpZCI6InMwMyIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTQxNjM3MjYsImlhdCI6MTY5MzkwNDUyNiwicGx0IjotMX0.qbGzF0ozp9kOy3-OpxhfTvYdG484BJFQNB3jYkZMOCg; bili_ticket_expires=1694163726; home_feed_column=4; bp_video_offset_34569657=838103601562779753; CURRENT_QUALITY=64; b_lsid=5C5AEC83_18A693B170C; browser_resolution=269-609; PVID=4',
+    'origin': 'https://www.bilibili.com',
+    'referer': 'https://www.bilibili.com/video/BV1FG4y1Z7po/?spm_id_from=333.337.search-card.all.click&vd_source=69a50ad969074af9e79ad13b34b1a548',
+    'sec-ch-ua': '"Chromium";v="106", "Microsoft Edge";v="106", "Not;A=Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-site',
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36 Edg/106.0.1370.47'
+}
+
+cid_num = 1  # 用于记录获取弹幕链接的数量，到300即停止
+ye = 1 # 记录爬取的页数
+
+def Get_Source(page): # 用于获取搜索结果页的源码
+    # 这是b站搜索结果页的网址
+    get_url = f'https://api.bilibili.com/x/web-interface/wbi/search/type?__refresh__=true&_extra=&context=&page={page}&page_size=42&from_source=&from_spmid=333.337&platform=pc&highlight=1&single_column=0&keyword=日本核废水排海&qv_id=zaOudcC1LJI0GehR81nuNQEKktKQ2aP1&ad_resource=5654&source_tag=3&gaia_vtoken=&category_id=&search_type=video'
+    # 发送请求
+    response = requests.get(url=get_url, headers=headers)
+    # 解析数据
+    source = response.text
+    print('成功获取源码')
+    return source
+
+    """""
+    把爬取到的数据写到小本,在代码过程中这些过程文件帮助我debug
+    with open("source.txt", "w", encoding="utf-8") as www:
+        www.write(source)
+    """
+
+def Get_Bv(source): # 用于获取每一页的42个视频的bv号
+    url_list = list()
+    # 现在将每个视频的bv号搞到手,拼接成网址存在bv_list.txt里
+    with open("bv_list.txt", "a", encoding="utf-8") as www: # 过程文件
+        text_list = re.findall('.*?"bvid":"(.*?)","title":".*?', source)
+        for index in text_list:
+            temp = "http://www.bilibili.com/video/" + index
+            www.write(temp)
+            www.write("\n")
+            url_list.append(temp)
+    print("成功获取bv号")
+    return url_list
+
+
+def Get_Danmuurl(url_list):# 获取每个视频的弹幕链接
+    xml_url = list()
+    count = 0
+    for index in url_list:
+        response = requests.get(url=url_list[count], headers=headers)
+        html_str = response.content.decode()
+        # 使用正则找出该弹幕地址，这里的正则研究了好一会
+        getWord_url = str(re.findall('"bvid\":\".*?"cids\":{\"1\":(.*?)}},\"BV.*?\":{\"aid\":', html_str))
+        # 另一种方法：
+        # https://api.bilibili.com/x/player/pagelist?bvid=" + str(i) + "&amp;jsonp=jsonp
+        # 这个接口把str（i）改成bv号后request可以通过简单的正则获取cid号
+        getWord_url = getWord_url.replace("['", "")
+        getWord_url = getWord_url.replace("']", "")
+        print(getWord_url)
+        # 组装成要请求的xml地址
+        xml_url.append("https://comment.bilibili.com/{}.xml".format(getWord_url))
+        count += 1
+        global cid_num
+        cid_num += 1
+        if cid_num > 300:
+            break
+    print("获取弹幕链接成功")
+    return xml_url
+
+def Get_Danmu(xml_url): # 获取弹幕
+    for index in xml_url:
+        response = requests.get(url=index, headers=headers)
+        response.encoding = 'utf-8'
+        page = response.text
+        # print(page)
+        danmu = re.findall('.*?">(.*?)</d>.*?', page)
+        with open('danmu.txt', 'a', encoding='utf-8') as fp:
+            for inde in danmu:
+                fp.write(inde)
+                fp.write('\n')
+        global num
+        num += 1
+    global ye# 记录页数
+    print(f'第{ye}页爬取完成')
+
+
+if __name__ == '__main__':
+    # 由于一页有42个视频，所以需要爬取8页，但只会爬取前300个视频
+    for page in range(1, 9):
+        source = Get_Source(page)
+        url_list = Get_Bv(source)
+        xml_url = Get_Danmuurl(url_list)
+        Get_Danmu(xml_url)
+
+
+
+
