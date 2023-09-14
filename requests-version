@@ -1,6 +1,8 @@
 import re
 import requests  # 发送请求
 import xlwt
+import stylecloud
+import jieba
 
 
 # 由于b站的反爬比较严格，请求头需要以下信息
@@ -55,6 +57,7 @@ def Get_Danmuurl(url_list):# 获取每个视频的弹幕链接
     for index in url_list:
         response = requests.get(url=index, headers=headers)
         html_str = response.content.decode()
+        # print(html_str)
         # 使用正则找出该弹幕地址，这里的正则研究了好一会
         getWord_url = str(re.findall('"bvid\":\".*?"cids\":{\"1\":(.*?)}},\"BV.*?\":{\"aid\":', html_str))
         # 另一种方法：
@@ -122,6 +125,26 @@ def rank(): #用于排序弹幕
     path = 'Top20.xls'
     book.save(path)
 
+# 生成词云
+def cloud_making():
+    with open('danmu.txt','r',encoding= 'utf-8') as fp:
+        text = fp.read()
+    # 用结巴分词
+    a = ''.join(jieba.lcut(text))
+    stylecloud.gen_stylecloud(#file_path='danmu.txt',
+                              text = a,
+                            # 设置图形为答辩
+                              icon_name='fas fa-poo',
+                              palette='cmocean.diverging.Balance_20',
+                              font_path="msyh.ttc",
+                              background_color='white',
+                              output_name='cloud.jpg',
+                              gradient='horizontal',
+                              invert_mask=False,
+                              size=2048,
+                              max_words=300
+                              )
+
 
 
 if __name__ == '__main__':
@@ -138,6 +161,7 @@ if __name__ == '__main__':
 
     # 将弹幕排序
     rank()
-
+    # 生成词云图
+    cloud_making()
 
 
