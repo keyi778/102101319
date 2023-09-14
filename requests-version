@@ -1,5 +1,6 @@
 import re
 import requests  # 发送请求
+import xlwt
 
 
 # 由于b站的反爬比较严格，请求头需要以下信息
@@ -7,7 +8,6 @@ headers = {
     'authority': 'api.bilibili.com',
     'accept': 'application/json, text/plain, */*',
     'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
-    # 需定期更换cookie，否则location爬不到
     'cookie': 'buvid3=80F9E300-720E-9C19-0D28-A5D4230D2DFC87536infoc; b_nut=1676210987; i-wanna-go-back=-1; _uuid=4DD3B7E9-1A29-13AD-47E2-48386A76A8BE90520infoc; nostalgia_conf=-1; CURRENT_FNVAL=4048; rpdid=0zbfVG8QHp|120iIWSrZ|2N|3w1Prd3g; buvid4=FAD8EDA3-9709-41EE-568C-0C9D6FB1DB4D88711-023021222-JYdfLR1UNDTBrQyLrGTyBOYHeVOL1%2BB1AxvBTNw%2BVHPtH9eX3Q%2BZnA%3D%3D; buvid_fp_plain=undefined; DedeUserID=34569657; DedeUserID__ckMd5=f1d0b62514d37ecd; b_ut=5; header_theme_version=CLOSE; CURRENT_PID=de39fa50-cd76-11ed-842d-810a17e96eab; FEED_LIVE_VERSION=V8; hit-new-style-dyn=1; hit-dyn-v2=1; fingerprint=5bf0be3b1bb6fb8d75ba1671a4d654df; buvid_fp=5bf0be3b1bb6fb8d75ba1671a4d654df; LIVE_BUVID=AUTO7816910652238640; SESSDATA=fe04243d%2C1709369802%2C10cb6%2A92AaAMqI1zfwMCavcaBW1sM9l41EVKbV-grlEdaCqYK8nH0TFXqjTjnefAFBFA-eiFRW7MjQAAOQA; bili_jct=a65e3acc9cab9cf24166cf8635ce800f; sid=6vvs0n40; bili_ticket=eyJhbGciOiJIUzI1NiIsImtpZCI6InMwMyIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTQxNjM3MjYsImlhdCI6MTY5MzkwNDUyNiwicGx0IjotMX0.qbGzF0ozp9kOy3-OpxhfTvYdG484BJFQNB3jYkZMOCg; bili_ticket_expires=1694163726; home_feed_column=4; bp_video_offset_34569657=838103601562779753; CURRENT_QUALITY=64; b_lsid=5C5AEC83_18A693B170C; browser_resolution=269-609; PVID=4',
     'origin': 'https://www.bilibili.com',
     'referer': 'https://www.bilibili.com/video/BV1FG4y1Z7po/?spm_id_from=333.337.search-card.all.click&vd_source=69a50ad969074af9e79ad13b34b1a548',
@@ -33,22 +33,18 @@ def Get_Source(page): # 用于获取搜索结果页的源码
     print('成功获取源码')
     return source
 
-    """""
-    把爬取到的数据写到小本,在代码过程中这些过程文件帮助我debug
-    with open("source.txt", "w", encoding="utf-8") as www:
-        www.write(source)
-    """
+
+    # 把爬取到的数据写到小本,在代码过程中这些过程文件帮助我debug
+    # with open("source.txt", "w", encoding="utf-8") as www:
+    #   www.write(source)
+
 
 def Get_Bv(source): # 用于获取每一页的42个视频的bv号
     url_list = list()
-    # 现在将每个视频的bv号搞到手,拼接成网址存在bv_list.txt里
-    with open("bv_list.txt", "a", encoding="utf-8") as www: # 过程文件
-        text_list = re.findall('.*?"bvid":"(.*?)","title":".*?', source)
-        for index in text_list:
-            temp = "http://www.bilibili.com/video/" + index
-            www.write(temp)
-            www.write("\n")
-            url_list.append(temp)
+    text_list = re.findall('.*?"bvid":"(.*?)","title":".*?', source)
+    for index in text_list:
+        temp = "http://www.bilibili.com/video/" + index
+        url_list.append(temp)
     print("成功获取bv号")
     return url_list
 
@@ -57,7 +53,7 @@ def Get_Danmuurl(url_list):# 获取每个视频的弹幕链接
     xml_url = list()
     count = 0
     for index in url_list:
-        response = requests.get(url=url_list[count], headers=headers)
+        response = requests.get(url=index, headers=headers)
         html_str = response.content.decode()
         # 使用正则找出该弹幕地址，这里的正则研究了好一会
         getWord_url = str(re.findall('"bvid\":\".*?"cids\":{\"1\":(.*?)}},\"BV.*?\":{\"aid\":', html_str))
@@ -84,24 +80,64 @@ def Get_Danmu(xml_url): # 获取弹幕
         page = response.text
         # print(page)
         danmu = re.findall('.*?">(.*?)</d>.*?', page)
-        with open('danmu.txt', 'a', encoding='utf-8') as fp:
+        with open('danmu.txt', 'a', encoding='utf-8') as fp:# 爬到的弹幕放在记事本
             for inde in danmu:
                 fp.write(inde)
                 fp.write('\n')
-        global num
-        num += 1
     global ye# 记录页数
     print(f'第{ye}页爬取完成')
+    ye += 1
+
+
+def rank(): #用于排序弹幕
+    dicta = dict()
+    danmu = str()
+    # 这里统计弹幕数量
+    with open("danmu.txt", 'r', encoding='utf-8') as fp:
+        danmua = fp.readlines()
+        for index in danmua:
+            if index not in dicta:
+                dicta[index] = 1
+            else:
+                dicta[index] += 1
+    # 将结果排序
+    list1 = sorted(dicta.items(), key=lambda d: d[1], reverse=True)
+
+    # 这里将排名前20结果写入excel
+    book = xlwt.Workbook(encoding='utf-8', style_compression=0)
+    # 命名该表格
+    sheet = book.add_sheet('DanMu_Analyze', cell_overwrite_ok=True)
+    # 定义表格每列的标题
+    col = ('Content', 'number')
+    for i in range(2):
+        sheet.write(0, i, col[i])
+    row = 1
+    for index in list1:
+        sheet.write(row, 0, index[0])
+        sheet.write(row, 1, index[1])
+        row += 1
+        if row > 20:
+            break
+    # 设定路径并保存表格
+    path = 'Top20.xls'
+    book.save(path)
+
 
 
 if __name__ == '__main__':
     # 由于一页有42个视频，所以需要爬取8页，但只会爬取前300个视频
     for page in range(1, 9):
+        # 获取搜索结果页的源码
         source = Get_Source(page)
+        # 获取每一页的42个视频的bv号
         url_list = Get_Bv(source)
+        # 获取每个视频的弹幕链接
         xml_url = Get_Danmuurl(url_list)
+        # 获取弹幕
         Get_Danmu(xml_url)
 
+    # 将弹幕排序
+    rank()
 
 
 
