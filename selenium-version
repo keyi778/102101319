@@ -1,0 +1,52 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+import time
+from bs4 import BeautifulSoup
+# 实例化网页
+bro = webdriver.Chrome()
+bro.get('https://www.bilibili.com/')
+
+# 打开网页，搜索日本核废水排海
+search_input = bro.find_element(By.CLASS_NAME,"nav-search-input")
+search_button = bro.find_element(By.CLASS_NAME,"nav-search-btn")
+search_input.send_keys("日本核废水排海")
+search_button.click()
+time.sleep(1)
+
+# 切换窗口句柄
+page_list = bro.window_handles
+bro.switch_to.window(page_list[1])
+
+
+# 获取网页源码
+html = bro.page_source
+soup = BeautifulSoup(html,'lxml')
+bv_list = soup.find_all(class_='bili-video-card__wrap __scale-wrap')
+
+# print(type(bv_list))
+# print(bv_list)
+
+for index in bv_list:
+    href = index.find('a').get('href')
+    print(href)
+
+
+# 按下“下一页”按钮
+for index in range(1,9):
+    turn_button = bro.find_elements(By.CSS_SELECTOR, '.vui_pagenation--btns button')
+    turn_button[-1].click()
+    time.sleep(7)# 等待页面完全加载
+
+
+    # 获取网页源码
+    html = bro.page_source
+    soup = BeautifulSoup(html,'lxml')
+    bv_list = soup.find_all(class_='bili-video-card__wrap __scale-wrap')
+
+
+    # 获取bv号
+    for index in bv_list:
+        href = index.find('a').get('href')
+        print(href)
+
+# 之后的步骤和requests版本的相同
